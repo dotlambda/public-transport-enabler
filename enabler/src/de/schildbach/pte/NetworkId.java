@@ -22,7 +22,7 @@ package de.schildbach.pte;
  */
 public enum NetworkId {
     // Europe
-    RT,
+    RT, FLIXBUS,
 
     // Germany
     DB, BVG, VBB, NVV, BAYERN, MVV, INVG, AVV, VGN, VVM, VMV, HVV, SH, GVH, BSVAG, VBN, NASA, VVO, VMS, VGS, VRR, VRS, MVG, NPH, VRN, VVS, DING, KVV, VAGFR, NVBW, VVV,
