@@ -105,8 +105,35 @@ public class FlixbusProvider extends AbstractNetworkProvider {
         }
     }
     
-    public FlixbusProvider() {
+    public FlixbusProvider(final String authentication) {
         super(NetworkId.FLIXBUS);
+
+        httpClient.setHeader("X-API-Authentication", authentication);
+    }
+
+    private Location parseStation(final JSONObject stationObj) throws JSONException {
+        final JSONObject coordObj = stationObj.getJSONObject("coordinates");
+        return new Location(LocationType.STATION, stationObj.getString("id"),
+            Point.fromDouble(coordObj.getDouble("latitude"), coordObj.getDouble("longitude")),
+            stationObj.getString("full_address"), //TODO I'm not quite sure what the place argument is meant for
+            stationObj.getString("name"));
+    }
+
+    private Location getStationById(int id) throws IOException, JSONException {
+        final StringBuilder uri = new StringBuilder(API_BASE);
+        uri.append("network.json");
+        final CharSequence page = httpClient.get(HttpUrl.parse(uri.toString()), Charsets.UTF_8);
+
+        final JSONObject head = new JSONObject(page.toString());
+        final JSONArray stationObjs = head.getJSONArray("stations");
+        JSONObject stationObj;
+
+        for (int i = 0; i < stationObjs.length(); i++) {
+            stationObj = stationObjs.getJSONObject(i);
+            if (stationObj.getInt("id") == id) {
+                return parseStation(stationObj);
+            }
+        }
     }
 
     @Override
@@ -125,7 +152,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
         }
     }
 
-    @Override
+    /*@Override
     public SuggestLocationsResult suggestLocations(final CharSequence constraint) throws IOException {
         
         final CharSequence page = httpClient.get(HttpUrl.parse(uri), Charsets.UTF_8);
@@ -133,9 +160,9 @@ public class FlixbusProvider extends AbstractNetworkProvider {
         try {
             
         } catch (final JSONException x) {
-            throw new RuntimeException("cannot parse: '" + page + "' on " + uri, x);
+            throw new RuntimeException("cannot parse JSON on " + uri, x);
         }
-    }
+    }*/
 
     // via not supported.
     // dep not supported.
@@ -170,16 +197,13 @@ public class FlixbusProvider extends AbstractNetworkProvider {
             final JSONArray tripObjs = head.getJSONArray("trips");
 
             if (tripObjs.length() == 0) {
-                //TODO error: 
+                //TODO no trips found 
             } else if (tripObjs.length() > 1) {
                 //TODO error: search did not return exactly one station to exactly one other station
             }
             
             final List<Trip> trips = new ArrayList<Trip>();
             final Context context = new Context(from, to, date);
-            //TODO no trips trips found if the trips array is empty
-            // this can easily be checked using stations that are less than 50km apart,
-            // those can't be served legally by long distance buses in Germany
             final JSONObject tripObj = tripObjs.getJSONObject(0);
             // maybe we should check if from.id == tripObj.getJSONObject("from").getString("id")
             // and the same for to.id
@@ -187,7 +211,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
             final JSONArray itemObjs = tripObj.getJSONArray("items");
             for (int i = 0; i < itemObjs.length(); i++) {
                 final JSONObject itemObj = itemObjs.getJSONObject(i);
-                
+
                 // Java uses millisecond timestamp whereas this is in seconds, so *1000
                 final Date departureTime =
                     new Date(itemObj.getJSONObject("departure").getInt("timestamp") * 1000);
@@ -208,7 +232,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
                 final List<Stop> departures = new ArrayList<Stop>();
                 final List<Stop> arrivals = new ArrayList<Stop>();
                 departures.add(firstStop);
-                
+
                 if (itemObj.getString("type") == "interconnection") { // trip has mutliple legs
                     final JSONArray transferObjs = itemObj.getJSONArray("interconnection_transfers");
                     for (int j = 0; j < transferObjs.length(); j++) {
@@ -232,12 +256,10 @@ public class FlixbusProvider extends AbstractNetworkProvider {
                     legs.add(new Trip.Public(FLIXBUS_LINE, null,
                         departures.get(j), arrivals.get(j), null, null, null));
                 }
-                
             }
-
             return new QueryTripsResult(null, uri.toString(), from, null, to, context, trips);
         } catch (final JSONException x) {
-            throw new RuntimeException("cannot parse: '" + page + "' on " + uri, x);
+            throw new RuntimeException("cannot parse JSON on " + uri, x);
         }
     }
 
