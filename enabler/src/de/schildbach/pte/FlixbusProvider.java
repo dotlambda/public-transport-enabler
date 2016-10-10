@@ -109,6 +109,15 @@ public class FlixbusProvider extends AbstractNetworkProvider {
         super(NetworkId.FLIXBUS);
 
         httpClient.setHeader("X-API-Authentication", authentication);
+        //TODO set language
+    }
+
+    private JSONArray getStationObjs() throws IOException, JSONException {
+        final StringBuilder uri = new StringBuilder(API_BASE);
+        uri.append("network.json");
+        final CharSequence page = httpClient.get(HttpUrl.parse(uri.toString()), Charsets.UTF_8);
+        final JSONObject head = new JSONObject(page.toString());
+        return head.getJSONArray("stations");
     }
 
     private Location parseStation(final JSONObject stationObj) throws JSONException {
@@ -120,20 +129,14 @@ public class FlixbusProvider extends AbstractNetworkProvider {
     }
 
     private Location getStationById(int id) throws IOException, JSONException {
-        final StringBuilder uri = new StringBuilder(API_BASE);
-        uri.append("network.json");
-        final CharSequence page = httpClient.get(HttpUrl.parse(uri.toString()), Charsets.UTF_8);
-
-        final JSONObject head = new JSONObject(page.toString());
-        final JSONArray stationObjs = head.getJSONArray("stations");
-        JSONObject stationObj;
-
+        final JSONArray stationObjs = getStationObjs();
         for (int i = 0; i < stationObjs.length(); i++) {
-            stationObj = stationObjs.getJSONObject(i);
+            final JSONObject stationObj = stationObjs.getJSONObject(i);
             if (stationObj.getInt("id") == id) {
                 return parseStation(stationObj);
             }
         }
+        return null;
     }
 
     @Override
@@ -152,17 +155,35 @@ public class FlixbusProvider extends AbstractNetworkProvider {
         }
     }
 
-    /*@Override
-    public SuggestLocationsResult suggestLocations(final CharSequence constraint) throws IOException {
-        
-        final CharSequence page = httpClient.get(HttpUrl.parse(uri), Charsets.UTF_8);
+    @Override
+    public NearbyLocationsResult queryNearbyLocations(EnumSet<LocationType> types, Location location,
+        int maxDistance, int maxLocations) throws IOException {
+        return null;
+    }
 
+    @Override
+    public QueryDeparturesResult queryDepartures(String stationId, @Nullable Date time,
+        int maxDepartures, boolean equivs) throws IOException {
+        return null;
+    }
+
+    @Override
+    public SuggestLocationsResult suggestLocations(final CharSequence constraint) throws IOException {
+        final String search = constraint.toString().toLowerCase();
+        final List<SuggestedLocation> locations = new ArrayList<>();
         try {
-            
+            final JSONArray stationObjs = getStationObjs();
+            for (int i = 0; i < stationObjs.length(); i++) {
+                final JSONObject stationObj = stationObjs.getJSONObject(i);
+                if (stationObj.getString("aliases").toLowerCase().indexOf(search) != -1) {
+                    locations.add(new SuggestedLocation(parseStation(stationObj)));
+                }
+            }
+            return new SuggestLocationsResult(new ResultHeader(NetworkId.FLIXBUS, "meinfernbus", "v1", 0, stationObjs), locations);
         } catch (final JSONException x) {
-            throw new RuntimeException("cannot parse JSON on " + uri, x);
+            throw new RuntimeException("cannot parse JSON on network.json", x);
         }
-    }*/
+    }
 
     // via not supported.
     // dep not supported.
@@ -202,7 +223,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
                 //TODO error: search did not return exactly one station to exactly one other station
             }
             
-            final List<Trip> trips = new ArrayList<Trip>();
+            final List<Trip> trips = new ArrayList<>();
             final Context context = new Context(from, to, date);
             final JSONObject tripObj = tripObjs.getJSONObject(0);
             // maybe we should check if from.id == tripObj.getJSONObject("from").getString("id")
@@ -256,6 +277,9 @@ public class FlixbusProvider extends AbstractNetworkProvider {
                     legs.add(new Trip.Public(FLIXBUS_LINE, null,
                         departures.get(j), arrivals.get(j), null, null, null));
                 }
+                
+                //TODO fares
+                trips.add(new Trip(itemObj.getString("uid"), from, to, legs, null, null, legs.size() - 1));
             }
             return new QueryTripsResult(null, uri.toString(), from, null, to, context, trips);
         } catch (final JSONException x) {
@@ -267,6 +291,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
     public QueryTripsResult queryMoreTrips(QueryTripsContext context, boolean later) throws IOException {
         if (later) {
             //TODO error: later not supported
+            return null;
         } else {
             final Context ctx = (Context) context;
             final Calendar c = new GregorianCalendar(TimeZone.getTimeZone("Europe/Berlin"));
