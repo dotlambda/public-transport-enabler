@@ -17,38 +17,20 @@
 
 package de.schildbach.pte.live;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
-import java.net.SocketTimeoutException;
-import java.util.Comparator;
 import java.util.Date;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
-import com.google.common.collect.ComparisonChain;
-
-import de.schildbach.pte.NetworkProvider.Accessibility;
-import de.schildbach.pte.NetworkProvider.WalkSpeed;
 import de.schildbach.pte.FlixbusProvider;
-import de.schildbach.pte.dto.Line;
-import de.schildbach.pte.dto.LineDestination;
 import de.schildbach.pte.dto.Location;
-import de.schildbach.pte.dto.LocationType;
-import de.schildbach.pte.dto.NearbyLocationsResult;
-import de.schildbach.pte.dto.Product;
-import de.schildbach.pte.dto.QueryDeparturesResult;
+import de.schildbach.pte.dto.Trip;
 import de.schildbach.pte.dto.QueryTripsResult;
-import de.schildbach.pte.dto.StationDepartures;
-import de.schildbach.pte.dto.Style;
 import de.schildbach.pte.dto.SuggestLocationsResult;
-import de.schildbach.pte.util.Iso8601Format;
 
 /**
  * @author Robert Schütz
@@ -62,10 +44,26 @@ public class FlixbusProviderLiveTest extends AbstractProviderLiveTest {
     public void suggestLocationsKornwestheim() throws Exception {
         final SuggestLocationsResult stuttgartResult = suggestLocations("Stuttgart");
         final SuggestLocationsResult kornwestheimResult = suggestLocations("kornWEST");
+        print(kornwestheimResult);
         final List<Location> stuttgartLocations = stuttgartResult.getLocations();
         final List<Location> kornwestheimLocations = kornwestheimResult.getLocations();
         assertEquals(kornwestheimLocations.size(), 1);
         // Kornwestheim should be one of the stations returned when searching for Stuttgart
         assertNotEquals(stuttgartLocations.indexOf(kornwestheimLocations.get(0)), -1);
+    }
+
+    @Test
+    public void queryTripsAachenHeidelberg() throws Exception {
+        final SuggestLocationsResult aachenResult = suggestLocations("aix-la-chapelle");
+        final SuggestLocationsResult heidelbergResult = suggestLocations("heidelberg");
+        final QueryTripsResult result = queryTrips(
+            aachenResult.getLocations().get(0), null,
+            heidelbergResult.getLocations().get(0),
+            new Date(), true, null, null, null);
+        print(result);
+        for (int i = 0; i < result.trips.size(); i++) {
+            final Trip trip = result.trips.get(i);
+            assertFalse(trip.getFirstDepartureTime().before(new Date()));
+        }
     }
 }

@@ -179,7 +179,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
                     locations.add(new SuggestedLocation(parseStation(stationObj)));
                 }
             }
-            return new SuggestLocationsResult(new ResultHeader(NetworkId.FLIXBUS, "meinfernbus", "v1", 0, stationObjs), locations);
+            return new SuggestLocationsResult(null, locations);
         } catch (final JSONException x) {
             throw new RuntimeException("cannot parse JSON on network.json", x);
         }
@@ -226,7 +226,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
             final List<Trip> trips = new ArrayList<>();
             final Context context = new Context(from, to, date);
             final JSONObject tripObj = tripObjs.getJSONObject(0);
-            // maybe we should check if from.id == tripObj.getJSONObject("from").getString("id")
+            // maybe we should check if from.id equals tripObj.getJSONObject("from").getString("id")
             // and the same for to.id
 
             final JSONArray itemObjs = tripObj.getJSONArray("items");
@@ -235,7 +235,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
 
                 // Java uses millisecond timestamp whereas this is in seconds, so *1000
                 final Date departureTime =
-                    new Date(itemObj.getJSONObject("departure").getInt("timestamp") * 1000);
+                    new Date(itemObj.getJSONObject("departure").getInt("timestamp") * 1000L);
                 // ignore the item if its departure is before the time searched for
                 if (departureTime.before(date)) {
                     // if there is a trip before the given time but on the same day,
@@ -246,7 +246,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
 
                 final Stop firstStop = new Stop(from, true, departureTime, null, null, null);
                 final Stop lastStop = new Stop(to, false,
-                    new Date(itemObj.getJSONObject("arrival").getInt("timestamp") * 1000),
+                    new Date(itemObj.getJSONObject("arrival").getInt("timestamp") * 1000L),
                     null, null, null);
 
                 List<Leg> legs = new ArrayList<Leg>();
@@ -254,7 +254,7 @@ public class FlixbusProvider extends AbstractNetworkProvider {
                 final List<Stop> arrivals = new ArrayList<Stop>();
                 departures.add(firstStop);
 
-                if (itemObj.getString("type") == "interconnection") { // trip has mutliple legs
+                if (itemObj.getString("type").equals("interconnection")) { // trip has mutliple legs
                     final JSONArray transferObjs = itemObj.getJSONArray("interconnection_transfers");
                     for (int j = 0; j < transferObjs.length(); j++) {
                         // parse transfer and add arrival, departure to lists
@@ -262,13 +262,13 @@ public class FlixbusProvider extends AbstractNetworkProvider {
                         final Location location = getStationById(transferObj.getInt("station_id"));
                          
                         arrivals.add(new Stop(location, false,
-                            new Date(transferObj.getJSONObject("arrival").getInt("timestamp") * 1000),
+                            new Date(transferObj.getJSONObject("arrival").getInt("timestamp") * 1000L),
                             null, null, null));
                         departures.add(new Stop(location, true,
-                            new Date(transferObj.getJSONObject("departure").getInt("timestamp") * 1000),
+                            new Date(transferObj.getJSONObject("departure").getInt("timestamp") * 1000L),
                             null, null, null));
                     }
-                } else if (itemObj.getString("type") != "direct") {
+                } else if (!itemObj.getString("type").equals("direct")) {
                     //TODO error: unknown type
                 }
 
